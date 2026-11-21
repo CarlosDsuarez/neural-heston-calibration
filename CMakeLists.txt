@@ -76,6 +76,15 @@ if(NHC_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
 endif()
 
 # ---------------------------------------------------------------------------
+# Parallel OpenMP Dataset Generator CLI (Phase 3 T3.3)
+# ---------------------------------------------------------------------------
+option(NHC_BUILD_TOOLS "Build standalone C++ CLI tools (nhc_gen_dataset)" ON)
+if(NHC_BUILD_TOOLS)
+  add_executable(nhc_gen_dataset cpp/src/gen_dataset.cpp)
+  target_link_libraries(nhc_gen_dataset PRIVATE nhc_headers nhc_openmp)
+endif()
+
+# ---------------------------------------------------------------------------
 # C++ Unit Tests (Catch2 v3.9.1)
 # ---------------------------------------------------------------------------
 if(NHC_BUILD_TESTS)
@@ -94,6 +103,7 @@ if(NHC_BUILD_TESTS)
     cpp/tests/test_smoke.cpp
     cpp/tests/test_cos_pricer.cpp
     cpp/tests/test_calibration.cpp
+    cpp/tests/test_grid.cpp
   )
   target_link_libraries(nhc_tests PRIVATE nhc_headers Catch2::Catch2WithMain)
   catch_discover_tests(nhc_tests)

@@ -16,6 +16,7 @@
 
 #include "nhc/calibrate.hpp"
 #include "nhc/cos_pricer.hpp"
+#include "nhc/grid.hpp"
 #include "nhc/heston_cf.hpp"
 #include "nhc/iv_solver.hpp"
 #include "nhc/lm_solver.hpp"
@@ -194,4 +195,57 @@ NB_MODULE(nhc_core, m) {
         nb::arg("init"), nb::arg("lm_cfg") = nhc::LmConfig{}, nb::arg("cos_cfg") = nhc::CosConfig{},
         nb::arg("warmup") = 20, nb::arg("runs") = 1000,
         nb::arg("transform") = nhc::ParamTransform::LogArtanh);
+
+  nb::enum_<nhc::InterpSpace>(m, "InterpSpace")
+      .value("ImpliedVol", nhc::InterpSpace::ImpliedVol)
+      .value("TotalVariance", nhc::InterpSpace::TotalVariance);
+
+  nb::class_<nhc::AdaptiveGrid>(m, "AdaptiveGrid")
+      .def(nb::init<>())
+      .def(nb::init<std::vector<double>, std::vector<double>>(), nb::arg("taus"),
+           nb::arg("k_scaled"))
+      .def_prop_ro("num_taus", &nhc::AdaptiveGrid::num_taus)
+      .def_prop_ro("num_k", &nhc::AdaptiveGrid::num_k)
+      .def_prop_ro("size", &nhc::AdaptiveGrid::size)
+      .def_prop_ro("taus", &nhc::AdaptiveGrid::taus)
+      .def_prop_ro("k_scaled", &nhc::AdaptiveGrid::k_scaled)
+      .def("make_canonical_chain", &nhc::AdaptiveGrid::make_canonical_chain);
+
+  nb::class_<nhc::InterpOperator>(m, "InterpOperator")
+      .def(nb::init<const nhc::AdaptiveGrid&, const nhc::Market&, const nhc::Chain&>(),
+           nb::arg("grid"), nb::arg("market"), nb::arg("chain"))
+      .def_prop_ro("num_in_range", &nhc::InterpOperator::num_in_range)
+      .def_prop_ro("num_excluded", &nhc::InterpOperator::num_excluded)
+      .def_prop_ro("total_quotes", &nhc::InterpOperator::total_quotes)
+      .def_prop_ro("grid_size", &nhc::InterpOperator::grid_size)
+      .def_prop_ro("coverage", &nhc::InterpOperator::coverage)
+      .def_prop_ro("in_range_indices", &nhc::InterpOperator::in_range_indices)
+      .def(
+          "apply",
+          [](const nhc::InterpOperator& op,
+             nb::ndarray<const double, nb::shape<-1>, nb::c_contig> grid_iv,
+             nhc::InterpSpace space) {
+            if (grid_iv.shape(0) != op.grid_size()) {
+              throw std::invalid_argument("grid_iv length must match op.grid_size");
+            }
+            const std::size_t n_in = op.num_in_range();
+            auto* out = new double[n_in];
+            op.apply(grid_iv.data(), out, space);
+            nb::capsule owner(out, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+            return nb::ndarray<nb::numpy, double, nb::shape<-1>>(out, {n_in}, owner);
+          },
+          nb::arg("grid_iv"), nb::arg("space") = nhc::InterpSpace::TotalVariance)
+      .def("dense_matrix", [](const nhc::InterpOperator& op) {
+        const Eigen::MatrixXd M = op.dense_matrix();
+        const auto rows = static_cast<std::size_t>(M.rows());
+        const auto cols = static_cast<std::size_t>(M.cols());
+        auto* buf = new double[rows * cols];
+        for (std::size_t r = 0; r < rows; ++r) {
+          for (std::size_t c = 0; c < cols; ++c) {
+            buf[r * cols + c] = M(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(c));
+          }
+        }
+        nb::capsule owner(buf, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+        return nb::ndarray<nb::numpy, double, nb::shape<-1, -1>>(buf, {rows, cols}, owner);
+      });
 }
