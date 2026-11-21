@@ -452,11 +452,15 @@ def generate_misspecified_spx_proxy_series(
             regime = "elevated"
             target_v0, target_sig, lam_j, mu_j, sig_j = 0.048, 0.95, 0.75, -0.13, 0.11
         else:
-            # Test period includes a realistic volatility spike episode
-            in_shock = (t_idx - n_val_end) >= max(2, (n_days - n_val_end) // 3)
+            # Test period includes a realistic ~25% multi-day volatility spike episode
+            n_test_days = max(1, n_days - n_val_end)
+            offset = t_idx - n_val_end
+            shock_start = max(1, int(0.45 * n_test_days))
+            shock_end = shock_start + max(2, int(0.25 * n_test_days))
+            in_shock = shock_start <= offset < shock_end
             if in_shock:
                 regime = "stress"
-                target_v0, target_sig, lam_j, mu_j, sig_j = 0.18, 1.55, 1.60, -0.16, 0.14
+                target_v0, target_sig, lam_j, mu_j, sig_j = 0.16, 1.45, 1.35, -0.14, 0.12
             else:
                 regime = "calm"
                 target_v0, target_sig, lam_j, mu_j, sig_j = 0.032, 0.75, 0.55, -0.11, 0.09

@@ -53,6 +53,7 @@ struct LmConfig {
   int max_iter = 50;
   double tol_grad = 1e-8;
   double tol_step = 1e-10;
+  double tol_cost = 1e-7;  // MINPACK-style relative cost reduction ftol
   double lambda0 = 1e-3;
   double vega_floor = 1e-4;
   ResidualMode residual_mode = ResidualMode::VegaWeightedPrice;

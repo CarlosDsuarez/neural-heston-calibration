@@ -100,3 +100,23 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
     - `E3` Pointwise `64×4` (batched GEMM, no audit / + COS audit): **`3.02 ms`** (`0.71×` — **1.41× slower than E0!**) / **`3.14 ms`** (RMSE `0.0086 vp`)
     - `E4` Inverse 5-seed ensemble (no audit / + COS audit): **`0.0186 ms`** (`18.6 µs`) / **`0.235 ms`** (RMSE `0.423 vp`)
     - `E5` Hybrid (Inverse + 5 COS iters): **`1.33 ms` / `1.65 ms`** (`1.61×`, RMSE `1.05e-8 vp`)
+
+### Phase 7 — Full Benchmark Suite, Error Budget & Reproducible Report (Gate G7)
+- **Status:** PASS (artifacts: `results/benchmark_full.json`, `results/summary_tables.md`, `results/figures/fig1..4.png`)
+- **Deliverables:**
+  - `cpp/include/nhc/lm_solver.hpp` & `types.hpp`: Added relative cost-reduction stopping criterion (`tol_cost = 1e-7`, 2 consecutive steps) preventing LM spinning on active bounds / float32 surrogate floor while preserving 99%+ noiseless recovery.
+  - `python/nhc/bench/run.py`: Single-command end-to-end benchmark executing `Ref` + `E0`–`E5` across chronological held-out test days (calm + stress), paired Wilcoxon signed-rank tests, 1,000-resample bootstrap 95% CIs, maturity/moneyness/regime slices, intertemporal parameter stability `||ΔΘ||₁` & ATM delta/vega rotation, static no-arbitrage audit, 5-component error budget decomposition (Section 7.3), and formal H1–H5 verdicts. Supports `--spx-dir` for user-supplied real SPX CSV/JSON files and `--small` for fast reproduction.
+  - `python/nhc/bench/report.py`: Deterministic Markdown table & 4-figure (`fig1_latency_vs_accuracy.png`, `fig2_learning_curve.png`, `fig3_error_budget.png`, `fig4_daily_stability.png`) generator.
+  - `tests/test_phase7_benchmark.py`: End-to-end `--small` smoke test for benchmark + report + figures (21/21 pytest passing).
+- **Gate G7 Measured Values (Apple M5, 1 core, `OMP_NUM_THREADS=1`, `-std=c++20 -O3 -fno-math-errno`, `synthetic_bates_spx_proxy` 20 test days = 15 calm + 5 stress, 200 OTM quotes/day, all RMSEs exact COS-audited):**
+  - `Ref` (QuantLib+SciPy): RMSE `0.4699 vp`, p50 **`156.67 ms`**, p99 `247.21 ms`
+  - `E0` (COS+LM cold): RMSE `0.4699 vp` (calm `0.324`, stress `0.906`), p50 **`2.35 ms`** (**66.8× faster than Ref**), p99 **`4.51 ms`**, `100%` converged, 8.0 median iters
+  - `E1` (COS+LM warm): RMSE `0.4699 vp`, p50 **`1.97 ms`**, p99 `3.96 ms`, 5.0 median iters
+  - `E2` (Sobolev `64×4`, +COS audit): RMSE `0.4692 vp` (Wilcoxon $p=0.596$ vs E0), p50 **`0.426 ms`** (**5.51× faster than E0**, **368× faster than Ref**), p99 `1.07 ms`, raw & COS no-arb `0.00% / 0.00%`
+  - `E2` (+Circuit-Breaker): RMSE `0.4700 vp`, p50 `0.681 ms`, p99 `3.52 ms`, `20.0%` fallback rate (4/5 stress days, 0% calm)
+  - `E2` (Sobolev `128×4`, +COS audit): RMSE `0.4695 vp`, p50 **`0.579 ms`** (**4.06× faster than E0**), p99 `1.42 ms`
+  - `E3` (Pointwise `64×4`, batched GEMM): RMSE `0.4689 vp`, p50 **`3.59 ms`** (**1.53× slower than E0**), p99 `6.13 ms`
+  - `E4` (Inverse 5-seed ensemble only): RMSE `0.5185 vp`, p50 **`0.019 ms`** (`19 µs`), p99 `0.032 ms`
+  - `E5` (Hybrid: Inverse + 5 COS iters): RMSE `0.4699 vp`, p50 **`1.67 ms`**, p99 `3.61 ms`
+- **Error Budget (H4):** Surrogate `(a) 0.0176 vp`, Interp $M$ `(b) 0.0847 vp`, Optimizer dispersion `(c) 0.0000 vp`, Bid-ask microstructure `(e) 0.0298 vp`, Structural Heston misspecification `(d) 0.4699 vp` (**26.6×** surrogate error).
+- **Hypotheses Verdicts:** **H1 `CONFIRMED`**, **H2 `CONFIRMED`**, **H3 `INCONCLUSIVE`** (62.5% iter reduction on synthetic Heston Gate G5; attenuated to 37.5% on misspecified Bates market proxy), **H4 `CONFIRMED`** (on `synthetic_bates_spx_proxy`), **H5 `CONFIRMED`**.
