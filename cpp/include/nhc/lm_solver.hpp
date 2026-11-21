@@ -155,6 +155,7 @@ LmResult lm_solve_5d(std::size_t m, HestonParams init, const LmConfig& cfg,
 
   double lambda = std::max(cfg.lambda0, 1e-12);
   double nu = 2.0;
+  int small_rel_cost_streak = 0;
 
   for (int iter = 0; iter < cfg.max_iter; ++iter) {
     if (g.lpNorm<Eigen::Infinity>() <= cfg.tol_grad ||
@@ -224,6 +225,7 @@ LmResult lm_solve_5d(std::size_t m, HestonParams init, const LmConfig& cfg,
       const double pred = -g.dot(dz_eff) - 0.5 * dz_eff.dot(H * dz_eff);
 
       if (std::isfinite(cost_try) && cost_try < cost && pred > 0.0) {
+        const double rel_cost_drop = (cost - cost_try) / std::max(cost, 1e-30);
         const double rho_gain = (cost - cost_try) / pred;
         z = z_try;
         theta = theta_try;
@@ -237,7 +239,14 @@ LmResult lm_solve_5d(std::size_t m, HestonParams init, const LmConfig& cfg,
         accepted = true;
         ++res.iters;
 
-        if (dz_eff.norm() <= cfg.tol_step * (z.norm() + cfg.tol_step)) {
+        if (rel_cost_drop <= cfg.tol_cost) {
+          ++small_rel_cost_streak;
+        } else {
+          small_rel_cost_streak = 0;
+        }
+
+        if (dz_eff.norm() <= cfg.tol_step * (z.norm() + cfg.tol_step) ||
+            (small_rel_cost_streak >= 2 && cost > 0.0)) {
           res.converged = true;
         } else {
           if (fused_jac) {

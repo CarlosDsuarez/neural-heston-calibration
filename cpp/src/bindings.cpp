@@ -203,6 +203,7 @@ NB_MODULE(nhc_core, m) {
       .def_rw("max_iter", &nhc::LmConfig::max_iter)
       .def_rw("tol_grad", &nhc::LmConfig::tol_grad)
       .def_rw("tol_step", &nhc::LmConfig::tol_step)
+      .def_rw("tol_cost", &nhc::LmConfig::tol_cost)
       .def_rw("lambda0", &nhc::LmConfig::lambda0)
       .def_rw("vega_floor", &nhc::LmConfig::vega_floor)
       .def_rw("residual_mode", &nhc::LmConfig::residual_mode);
