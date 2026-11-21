@@ -9,6 +9,10 @@ from nhc.nhc_core import (
     Quote,
     ResidualMode,
     eigen_version,
+    eval_cf_and_dlogphi,
+    price_chain,
+    price_chain_with_jacobian,
+    price_option,
     version,
 )
 
@@ -24,5 +28,9 @@ __all__ = [
     "ResidualMode",
     "__version__",
     "eigen_version",
+    "eval_cf_and_dlogphi",
+    "price_chain",
+    "price_chain_with_jacobian",
+    "price_option",
     "version",
 ]

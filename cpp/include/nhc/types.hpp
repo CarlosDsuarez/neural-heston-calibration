@@ -41,6 +41,7 @@ using Chain = std::vector<Quote>;  // grouped by ascending tau
 struct CosConfig {
   int N = 128;
   double L = 12.0;
+  bool use_c4 = false;  // Optional Fang-Oosterlee / kurtosis-aware truncation guard
 };
 
 enum class ResidualMode : std::uint8_t {
