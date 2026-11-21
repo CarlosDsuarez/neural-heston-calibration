@@ -1,0 +1,47 @@
+# Build artifacts
+build/
+build-*/
+_skbuild/
+cmake-build-*/
+dist/
+*.egg-info/
+*.so
+*.dylib
+*.dll
+*.pyd
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Raw/vendor market data and large generated datasets (NEVER commit vendor data)
+data/*
+!data/README.md
+!data/mini_synthetic/
+!data/mini_synthetic/**
+
+# Large binary weights and checkpoints
+models/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.parquet
+*.npz
+*.h5
+*.bin
+!data/mini_synthetic/*.npz
+!results/models/*.bin
+!results/models/*.json
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
