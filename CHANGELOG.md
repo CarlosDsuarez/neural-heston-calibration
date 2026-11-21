@@ -27,3 +27,16 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
   - Price Jacobian vs central FD: max rel error **$\le 10^{-6}$** (PASS).
   - Measured Jacobian speedup (200-option chain, $N=128$, 1 core): `212 µs` analytic vs `162 µs` price-only (**4.59×** vs forward FD, **8.42×** vs central FD).
   - Documented boundary region: extreme vol-of-vol ($\sigma \in [1.5, 4.5]$, heavy Feller violation) has max `8.59e-04` at $(128, 12)$ and `1.08e-04` at $(512, 20)$; ultra-short $\tau \in [1\text{d}, 7\text{d}]$ and deep wings achieve machine precision (`9.34e-16` / `7.85e-12`).
+
+### Phase 2 — End-to-End Classical Calibration & Benchmark v0 (Gate G2)
+- **Status:** PASS (artifact: `results/phase2_gate_g2.json`)
+- **Deliverables:**
+  - `cpp/include/nhc/iv_solver.hpp`: Jäckel-style normalized OTM Black-76 solver (`erfcx` log-price lower branch, cancellation-free upper tail, safeguarded Halley's method); round-trip IV -> price -> IV error $\le 10^{-10}$ (down to $10^{-100} S_0$ OTM).
+  - `cpp/include/nhc/lm_solver.hpp`: Generic 5×5 Eigen `LDLT` Levenberg–Marquardt with scale-invariant Marquardt diagonal, Nielsen smooth damping, fused first-trial Jacobian evaluation, `LogArtanh` and `SqrtDrift` parameterizations.
+  - `cpp/include/nhc/calibrate.hpp`: `calibrate_cos_lm` supporting `VegaWeightedPrice` and `ImpliedVol` residual modes.
+  - `python/nhc/bench/naive_baseline.py`: Naive literature baseline (`Ref`: QuantLib Python + SciPy `least_squares` and `differential_evolution`).
+  - `python/nhc/bench/run_phase2.py`: Benchmark harness v0 (`steady_clock` in C++, 1 core, warmup, p50/p95/p99, hardware stamp).
+- **Gate G2 & Hypothesis H1 Measured Values (Apple M5, 1 core, `OMP_NUM_THREADS=1`, AppleClang 21.0.0 `-O3 -fno-math-errno`, 200-option chain, $N=128, L=12$):**
+  - **Gate G2 (100 noiseless surfaces, fixed cold start):** **99.0% recovery** ($\le 0.005$ vol pts, PASS $\ge 99\%$); 100% converged; 0% hit bounds; median RMSE IV = `1.19e-08` vol pts; p95 = `3.15e-07` vol pts; median LM iterations = `8.0`.
+  - **Hypothesis H1 (`E0` COS+LM, 1,000 runs across 100 chains):** **p50 = `2.83 ms`**, **p95 = `5.67 ms`**, **p99 = `8.30 ms`** (`< 10 ms` -> **H1 CONFIRMED on Apple M5**).
+  - **Naive Baseline (`Ref`, QuantLib Python + SciPy `least_squares`):** p50 = `244.84 ms` (**E0 is 86.7× faster** than Ref before any neural network).

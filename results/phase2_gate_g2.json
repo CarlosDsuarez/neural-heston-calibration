@@ -1,0 +1,56 @@
+{
+  "hardware": {
+    "timestamp_utc": "2026-11-21T20:50:45.527532+00:00",
+    "git_commit": "b931cdc",
+    "os": "Darwin 27.2.0",
+    "arch": "arm64",
+    "cpu": "Apple M5",
+    "cpu_count": "10",
+    "python": "3.12.13",
+    "eigen": "5.0.1",
+    "omp_num_threads": "1"
+  },
+  "config": {
+    "n_surfaces": 100,
+    "chain_size_target": 200,
+    "cos_N": 128,
+    "cos_L": 12.0,
+    "lm_max_iter": 60,
+    "residual_mode": "VegaWeightedPrice",
+    "cold_start": {
+      "v0": 0.04,
+      "kappa": 1.5,
+      "vbar": 0.04,
+      "sigma": 0.5,
+      "rho": -0.65
+    }
+  },
+  "gate_g2_recovery": {
+    "n_surfaces": 100,
+    "recovery_rate_le_0p005_vp": 0.99,
+    "converged_rate": 1.0,
+    "hit_bounds_rate": 0.0,
+    "rmse_iv_vol_pts_median": 1.1939084019770625e-08,
+    "rmse_iv_vol_pts_p95": 3.153880269757138e-07,
+    "rmse_iv_vol_pts_p99": 0.001439734178993225,
+    "rmse_iv_vol_pts_max": 0.14388631891630754,
+    "iters_median": 8.0,
+    "iters_p95": 13.049999999999997,
+    "gate_g2_pass": true
+  },
+  "h1_e0_latency_ms": {
+    "total_runs": 1000,
+    "p50_ms": 2.825021,
+    "p95_ms": 5.6724729,
+    "p99_ms": 8.297798749999998,
+    "mean_ms": 3.17015765,
+    "h1_pass_p99_lt_10ms": true
+  },
+  "ref_naive_quantlib_scipy": {
+    "n_runs": 5,
+    "p50_ms": 244.84158295672387,
+    "mean_ms": 224.25302498741075,
+    "rmse_iv_vol_pts_median": 7.540452812704892e-07,
+    "speedup_e0_over_ref": 86.66894262262966
+  }
+}
