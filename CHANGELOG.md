@@ -53,3 +53,18 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
   - **NaN/Inf count:** **`0`** (PASS).
   - **Max IV round-trip error across all 21.6M nodes:** **`1.20e-14`** ($\le 10^{-8}$ PASS).
   - Separate 10k validation and 10k test datasets generated locally (gitignored); `data/mini_synthetic/dataset.npz` (~800 KiB, $\le 1$ MB) committed for CI & `make repro-small`.
+
+### Phase 4 — Neural Surrogate (Baseline vs. Sobolev, Learning Curve & Architecture Sweep, Gate G4)
+- **Status:** PARTIAL PASS — RMSE & p99 goals PASSED; Sobolev Jacobian reduction measured at `1.70×` (`64×4`) / `2.23×` (`128×4`) vs `3.0×` target and reported honestly (artifact: `results/phase4_gate_g4.json`)
+- **Deliverables:**
+  - `python/nhc/eval/noarb.py`: Dense 40-point-per-slice static no-arbitrage auditor (calendar monotonicity + Durrleman butterfly, tol `1e-6`).
+  - `python/nhc/train/surrogate.py`: `GridSurrogateMLP` with smooth activations (`SiLU`, `Softplus`, `ELU`, `tanh`), analytic forward-mode 5-tangent Jacobian (verified to `< 1e-12` vs `torch.autograd.functional.jacobian`), Sobolev loss, optional differentiable no-arb penalty, and total-variance ablation.
+  - `python/nhc/train/run_phase4.py`: Full multi-core Phase 4 experiment runner (68 trained models across T4.2, T4.3, T4.4, and final champions on 240k surfaces).
+- **Gate G4 Measured Values (Apple M5, PyTorch 2.15.0 CPU, 10k held-out test set):**
+  - **Champion `sobolev_64x4`** (24,564 params, $\lambda_{\text{grad}}=1.0$, 240k): in-domain RMSE = **`0.0420 vol pts`** ($\le 0.05$ PASS), p99 = **`0.1315 vol pts`** ($\le 0.20$ PASS), full-domain RMSE = `0.0459 vol pts`, median Jacobian rel error = **`0.93%`** vs `1.59%` baseline (**`1.70×`** reduction).
+  - **Champion `sobolev_128x4`** (73,524 params, $\lambda_{\text{grad}}=1.0$, 240k): in-domain RMSE = **`0.0359 vol pts`** ($\le 0.05$ PASS), p99 = **`0.1064 vol pts`** ($\le 0.20$ PASS), full-domain RMSE = `0.0419 vol pts`, median Jacobian rel error = **`0.71%`** (**`2.23×`** reduction vs `baseline_64x4`).
+  - **Key Empirical Findings:**
+    - *Sobolev vs. explicit no-arb penalty (T4.2, 120k):* Sobolev ($\lambda_{\text{grad}}=1.0$) cut RMSE from `0.1267` to `0.0780 vp` AND reduced raw butterfly violations 5× (`0.94%` $\to$ `0.19%`), outperforming explicit $\lambda_{\text{arb}}=1.0$ (`0.1813 vp`, `1.65%` bfly).
+    - *Total-variance output ablation (T4.2):* `0.4763 vp` RMSE vs `0.0838 vp` for direct $\sigma_{IV}$ (5.7× worse due to short-maturity variance scaling).
+    - *Architecture sweep (T4.4, 120k):* `SiLU` (`0.0780 vp`) beat `ELU` (`0.0912`), `tanh` (`0.0972`), and `Softplus` (`0.1059`); width `128` reached `0.0594 vp` even at 120k / 80 epochs.
+    - *5-seed learning curve (T4.3, 10k..240k):* Sobolev delivered ~4× sample efficiency (`30k` Sobolev `0.0986 ± 0.0042 vp` beats `120k` Baseline `0.1473 ± 0.0054 vp`) and consistent `~1.9–2.0×` Jacobian error reduction across all sample sizes.
