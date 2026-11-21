@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software or benchmark results, please cite it as below."
+title: "neural-heston-calibration: C++20 COS+LM vs. Sobolev Neural Surrogates for Heston Calibration"
+version: "0.1.0"
+date-released: "2026-11-21"
+license: "MIT"
+repository-code: "https://github.com/CarlosDsuarez/neural-heston-calibration"
+authors:
+  - family-names: "Suarez"
+    given-names: "Carlos"
+keywords:
+  - quantitative-finance
+  - heston-model
+  - option-pricing
+  - volatility-surface
+  - calibration
+  - cpp20
+  - eigen
+  - pytorch
+  - sobolev-training
+  - nanobind
+abstract: >-
+  A high-performance C++20/Python benchmark comparing an analytic-gradient
+  Fourier-COS + Levenberg-Marquardt Heston calibration engine against Sobolev
+  neural grid surrogates, pointwise random-grid surrogates, inverse warm-start
+  ensembles, and a mandatory out-of-distribution circuit-breaker.

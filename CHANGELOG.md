@@ -2,7 +2,17 @@
 
 Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured values, hardware info, and commit hash. No performance claim is entered without a reproducible measurement.
 
-## [Unreleased]
+## [0.1.0] — 2026-11-21
+
+### Phase 8 — Closure, Documentation & Clean-Clone Reproducibility (Gate G8)
+- **Status:** PASS (verified from clean clone in `/tmp/nhc-clean-test`)
+- **Deliverables:**
+  - `docs/rough_viability.md`: <= 2-page technical note analyzing rBergomi / Rough Heston vs. standard Heston, stack transferability, and verified empirical SPX findings (Abi Jaber & Li, arXiv:2401.03345).
+  - `README.md`: Complete English README following Section 10.4 (TL;DR, Why this project, Method, Results with measured Apple M5 tables & figures, mandatory Limitations, Reproduce, verified References & Citation).
+  - `CITATION.cff`: Versioned `0.1.0` software citation metadata (MIT license).
+  - `Makefile`: `setup`, `build`, `test`, `lint`, `data`, `repro-small`, `repro`, and `clean` targets (with optional `SPX_DIR=...` support).
+  - `data/README.md`: Documented real SPX CSV/JSON ingestion schema for `--spx-dir`.
+- **Gate G8:** Verified clean-clone `make repro-small` end-to-end in **`32.8 s`** (limit `< 30 min`, Apple M5: fresh clone -> `.venv` + C++20/nanobind build -> `nhc.bench.run --small` + `nhc.bench.report` -> reproduced `results/summary_tables.md` + 4 figures).
 
 ### Phase 0 — Foundations (Gate G0)
 - **Status:** PASS (GitHub Actions CI run `44945961288` green across `gcc`, `clang`, `clang-format`, `ruff`)
