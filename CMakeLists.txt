@@ -104,7 +104,9 @@ if(NHC_BUILD_TESTS)
     cpp/tests/test_cos_pricer.cpp
     cpp/tests/test_calibration.cpp
     cpp/tests/test_grid.cpp
+    cpp/tests/test_mlp_ood.cpp
   )
+  target_compile_definitions(nhc_tests PRIVATE NHC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(nhc_tests PRIVATE nhc_headers Catch2::Catch2WithMain)
   catch_discover_tests(nhc_tests)
 endif()

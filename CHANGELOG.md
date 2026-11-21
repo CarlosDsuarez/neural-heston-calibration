@@ -81,3 +81,22 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
   - **Hypothesis H3 (warm-start LM iteration reduction):** Cold start median = **`8.0`** iters $\to$ inverse warm-start median = **`3.0`** iters (**`62.5%` reduction**, $\ge 40\%$ -> **H3 CONFIRMED on synthetic test set**).
   - *Pointwise random-grid ablation (10k test):* in-domain RMSE = **`0.0262 vol pts`**, p99 = **`0.0883 vol pts`**.
   - *OOD calibration (99.5% validation quantile):* `mahal_threshold = 8.08`, `ens_var_threshold = 4.7e-4`.
+
+### Phase 6 — C++20/Eigen Inference Engine, Forward-Mode Jacobian & OOD Circuit-Breaker (Gate G6)
+- **Status:** PASS (artifact: `results/phase6_gate_g6.json`)
+- **Deliverables:**
+  - `cpp/include/nhc/mlp_eigen.hpp`: Zero-dependency Eigen 5.0.1 loader (`NHC1` with strict FNV-1a 64-bit grid-hash validation), `MlpSurrogateT<float/double>` with fused 5-tangent forward-mode Jacobian, `MlpInverseEnsembleT<float>` (5-member warm-start + disagreement variance), and `MlpPointwiseT<float>` (batched GEMM + reverse-mode Jacobian across all options simultaneously).
+  - `cpp/include/nhc/ood.hpp`: `CircuitBreaker` implementing all 5 Section 8.1 OOD triggers (box margin, Mahalanobis distance, ensemble variance, COS-vs-surrogate discrepancy > 0.15 vol pts, LM failure/bounds, market support/coverage) + `project_chain_to_grid`.
+  - `cpp/include/nhc/calibrate.hpp`: End-to-end C++ engines `calibrate_surrogate_lm` (E2), `calibrate_pointwise_lm` (E3), `calibrate_inverse_only` (E4), and `calibrate_hybrid` (E5), each with stage-by-stage timing breakdown and mandatory exact COS audit option.
+  - `cpp/tests/test_mlp_ood.cpp` (17/17 C++ tests passing) & `tests/test_phase6_cpp_inference.py` (20/20 pytest passing).
+- **Gate G6 Measured Values (Apple M5, 1 core, `OMP_NUM_THREADS=1`, 200-option off-grid chain, 1,000 C++ `steady_clock` runs):**
+  - **T6.1 Parity (PyTorch vs. C++ Eigen across SiLU/Softplus/ELU/tanh, forward + Jacobian):** `<= 1e-9` abs (`float64`), `<= 1e-5` rel (`float32`) — **PASS**.
+  - **OOD Circuit-Breaker:** **100% (6/6)** synthetic OOD scenarios across all 5 rules triggered fallback to exact COS+LM; `5%` fallback rate on clean in-domain chains — **PASS**.
+  - **Pure-C++ Latency Summary (p50 / p99, exact COS-audited median RMSE):**
+    - `E0` COS+LM cold: **`2.14 ms` / `4.72 ms`** (RMSE `1.45e-8 vp`, 7.5 iters)
+    - `E1` COS+LM warm: **`1.33 ms` / `1.70 ms`** (`1.61×`, RMSE `1.05e-8 vp`, 4.0 iters)
+    - `E2` Surrogate `64×4` Sobolev (no audit / + COS audit): **`0.192 ms`** (`11.2×`) / **`0.411 ms`** (`5.21×`, p99 `0.608 ms`, RMSE `0.056 vp`; breakdown: `12.7 µs` interp $M$ + `182.8 µs` neural LM + `215.8 µs` COS audit)
+    - `E2` Surrogate `128×4` Sobolev (no audit / + COS audit): **`0.369 ms`** (`5.79×`) / **`0.587 ms`** (`3.65×`, p99 `0.909 ms`, RMSE **`0.046 vp`**)
+    - `E3` Pointwise `64×4` (batched GEMM, no audit / + COS audit): **`3.02 ms`** (`0.71×` — **1.41× slower than E0!**) / **`3.14 ms`** (RMSE `0.0086 vp`)
+    - `E4` Inverse 5-seed ensemble (no audit / + COS audit): **`0.0186 ms`** (`18.6 µs`) / **`0.235 ms`** (RMSE `0.423 vp`)
+    - `E5` Hybrid (Inverse + 5 COS iters): **`1.33 ms` / `1.65 ms`** (`1.61×`, RMSE `1.05e-8 vp`)
