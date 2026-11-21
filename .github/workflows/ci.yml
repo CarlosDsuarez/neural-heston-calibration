@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "phase-*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint:
+    name: Lint (clang-format & ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Check C++ formatting
+        run: |
+          find cpp -type f \( -name '*.hpp' -o -name '*.cpp' \) -print0 | \
+            xargs -0 clang-format --dry-run --Werror
+      - name: Install ruff
+        uses: astral-sh/setup-uv@v4
+      - name: Check Python lint & format
+        run: |
+          uvx ruff check python tests
+          uvx ruff format --check python tests
+
+  cpp-and-python:
+    name: Build & Test (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - name: gcc
+            cc: gcc
+            cxx: g++
+          - name: clang
+            cc: clang
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libomp-dev clang
+
+      - name: Setup uv & Python 3.12
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Configure & Build C++ tests
+        env:
+          CC: ${{ matrix.compiler.cc }}
+          CXX: ${{ matrix.compiler.cxx }}
+        run: |
+          cmake -B build-cpp -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNHC_BUILD_TESTS=ON \
+            -DNHC_BUILD_PYTHON=OFF
+          cmake --build build-cpp --parallel
+
+      - name: Run C++ unit tests (ctest)
+        run: ctest --test-dir build-cpp --output-on-failure
+
+      - name: Create venv & install Python package + dev dependencies
+        env:
+          CC: ${{ matrix.compiler.cc }}
+          CXX: ${{ matrix.compiler.cxx }}
+        run: |
+          uv venv --python 3.12
+          uv pip install --python .venv/bin/python \
+            numpy scipy pandas pyarrow matplotlib scikit-learn pytest ruff QuantLib \
+            nanobind==3.1.0 scikit-build-core
+          uv pip install --python .venv/bin/python \
+            --index-url https://download.pytorch.org/whl/cpu torch
+          uv pip install --python .venv/bin/python --no-build-isolation --no-deps -e .
+
+      - name: Run Python test suite (pytest)
+        run: .venv/bin/pytest
