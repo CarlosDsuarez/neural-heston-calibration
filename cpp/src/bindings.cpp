@@ -1,13 +1,62 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/stl/array.h>
+#include <nanobind/stl/complex.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
 #include <Eigen/Core>
+#include <array>
+#include <complex>
+#include <cstddef>
 #include <string>
+#include <vector>
 
+#include "nhc/cos_pricer.hpp"
+#include "nhc/heston_cf.hpp"
 #include "nhc/types.hpp"
 
 namespace nb = nanobind;
+
+namespace {
+
+nb::ndarray<nb::numpy, double, nb::shape<-1>> py_price_chain(const nhc::HestonParams& params,
+                                                             const nhc::Market& market,
+                                                             const nhc::Chain& chain,
+                                                             const nhc::CosConfig& cfg) {
+  const std::size_t n = chain.size();
+  auto* buf = new double[n];
+  nhc::price_chain(params, market, chain, cfg, buf);
+  nb::capsule owner(buf, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  return nb::ndarray<nb::numpy, double, nb::shape<-1>>(buf, {n}, owner);
+}
+
+std::pair<nb::ndarray<nb::numpy, double, nb::shape<-1>>,
+          nb::ndarray<nb::numpy, double, nb::shape<-1, 5>>>
+py_price_chain_with_jacobian(const nhc::HestonParams& params, const nhc::Market& market,
+                             const nhc::Chain& chain, const nhc::CosConfig& cfg) {
+  const std::size_t n = chain.size();
+  auto* p_buf = new double[n];
+  auto* j_buf = new double[n * 5];
+  nhc::price_chain_with_jacobian(params, market, chain, cfg, p_buf, j_buf);
+  nb::capsule p_owner(p_buf, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  nb::capsule j_owner(j_buf, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  return {
+      nb::ndarray<nb::numpy, double, nb::shape<-1>>(p_buf, {n}, p_owner),
+      nb::ndarray<nb::numpy, double, nb::shape<-1, 5>>(j_buf, {n, 5}, j_owner),
+  };
+}
+
+std::pair<std::complex<double>, std::array<std::complex<double>, 5>> py_eval_cf_and_dlogphi(
+    double u, double tau, double drift, const nhc::HestonParams& params) {
+  std::complex<double> phi;
+  std::array<std::complex<double>, 5> dlogphi;
+  nhc::eval_cf_and_dlogphi(u, tau, drift, params, phi, dlogphi);
+  return {phi, dlogphi};
+}
+
+}  // namespace
 
 NB_MODULE(nhc_core, m) {
   m.doc() = "C++20 core engine for neural-heston-calibration";
@@ -48,9 +97,11 @@ NB_MODULE(nhc_core, m) {
 
   nb::class_<nhc::CosConfig>(m, "CosConfig")
       .def(nb::init<>())
-      .def(nb::init<int, double>(), nb::arg("N") = 128, nb::arg("L") = 12.0)
+      .def(nb::init<int, double, bool>(), nb::arg("N") = 128, nb::arg("L") = 12.0,
+           nb::arg("use_c4") = false)
       .def_rw("N", &nhc::CosConfig::N)
-      .def_rw("L", &nhc::CosConfig::L);
+      .def_rw("L", &nhc::CosConfig::L)
+      .def_rw("use_c4", &nhc::CosConfig::use_c4);
 
   nb::enum_<nhc::ResidualMode>(m, "ResidualMode")
       .value("VegaWeightedPrice", nhc::ResidualMode::VegaWeightedPrice)
@@ -74,4 +125,13 @@ NB_MODULE(nhc_core, m) {
       .def_ro("func_evals", &nhc::LmResult::func_evals)
       .def_ro("converged", &nhc::LmResult::converged)
       .def_ro("hit_bounds", &nhc::LmResult::hit_bounds);
+
+  m.def("eval_cf_and_dlogphi", &py_eval_cf_and_dlogphi, nb::arg("u"), nb::arg("tau"),
+        nb::arg("drift"), nb::arg("params"));
+  m.def("price_option", &nhc::price_option, nb::arg("params"), nb::arg("market"), nb::arg("tau"),
+        nb::arg("strike"), nb::arg("is_call"), nb::arg("cfg") = nhc::CosConfig{});
+  m.def("price_chain", &py_price_chain, nb::arg("params"), nb::arg("market"), nb::arg("chain"),
+        nb::arg("cfg") = nhc::CosConfig{});
+  m.def("price_chain_with_jacobian", &py_price_chain_with_jacobian, nb::arg("params"),
+        nb::arg("market"), nb::arg("chain"), nb::arg("cfg") = nhc::CosConfig{});
 }

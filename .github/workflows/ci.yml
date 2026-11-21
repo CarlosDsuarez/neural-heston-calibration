@@ -26,7 +26,7 @@ jobs:
           uvx ruff format --check python tests
 
   cpp-and-python:
-    name: Build & Test (${{ matrix.compiler }})
+    name: Build & Test (${{ matrix.compiler.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
