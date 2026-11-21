@@ -26,8 +26,8 @@ data/*
 !data/mini_synthetic/**
 
 # Large binary weights and checkpoints
-models/
-checkpoints/
+/models/
+/checkpoints/
 *.pt
 *.pth
 *.onnx

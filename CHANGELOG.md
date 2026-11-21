@@ -68,3 +68,16 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
     - *Total-variance output ablation (T4.2):* `0.4763 vp` RMSE vs `0.0838 vp` for direct $\sigma_{IV}$ (5.7× worse due to short-maturity variance scaling).
     - *Architecture sweep (T4.4, 120k):* `SiLU` (`0.0780 vp`) beat `ELU` (`0.0912`), `tanh` (`0.0972`), and `Softplus` (`0.1059`); width `128` reached `0.0594 vp` even at 120k / 80 epochs.
     - *5-seed learning curve (T4.3, 10k..240k):* Sobolev delivered ~4× sample efficiency (`30k` Sobolev `0.0986 ± 0.0042 vp` beats `120k` Baseline `0.1473 ± 0.0054 vp`) and consistent `~1.9–2.0×` Jacobian error reduction across all sample sizes.
+
+### Phase 5 — Inverse Warm-Start Ensemble, Pointwise Ablation & NHC1 `.bin` Export (Gate G5)
+- **Status:** PASS (artifact: `results/phase5_gate_g5.json`, exported models: `results/models/`)
+- **Deliverables:**
+  - `python/nhc/train/inverse.py`: `InverseMLP` ($180 \to 128 \times 3 \to 5$, `SiLU` + `tanh` box output) supporting both `param_mse` and `surrogate_recon` (through frozen Sobolev surrogate) losses, 5-seed ensemble uncertainty, and validation-calibrated Mahalanobis + ensemble-variance OOD thresholds.
+  - `python/nhc/train/pointwise.py`: 7D $\to$ 1D random-grid pointwise ablation (`64×4` `SiLU`, Baschetti et al. 2024).
+  - `python/nhc/export/to_bin.py`: Versioned `NHC1` little-endian binary exporter with FNV-1a 64-bit grid hash, training config hash, git commit hash, and `.json` sidecar metadata.
+  - `python/nhc/train/run_phase5.py`: Parallel training, exact COS evaluation, and export of 9 NHC1 models (`surrogate_baseline_64x4`, `surrogate_sobolev_64x4`, `surrogate_sobolev_128x4`, 5 `inverse_recon_s0..4` members, `pointwise_64x4`) + OOD calibration files.
+- **Gate G5 & Hypothesis H3 Measured Values (200 held-out in-domain test surfaces, exact COS audit):**
+  - *Inverse loss comparison (exact COS surface RMSE, median):* `param_mse` = **`0.088 vp`** vs `surrogate_recon` (single) = **`0.041 vp`** (2.15× better) vs `surrogate_recon` (5-seed ensemble) = **`0.034 vp`**.
+  - **Hypothesis H3 (warm-start LM iteration reduction):** Cold start median = **`8.0`** iters $\to$ inverse warm-start median = **`3.0`** iters (**`62.5%` reduction**, $\ge 40\%$ -> **H3 CONFIRMED on synthetic test set**).
+  - *Pointwise random-grid ablation (10k test):* in-domain RMSE = **`0.0262 vol pts`**, p99 = **`0.0883 vol pts`**.
+  - *OOD calibration (99.5% validation quantile):* `mahal_threshold = 8.08`, `ens_var_threshold = 4.7e-4`.
