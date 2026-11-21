@@ -40,3 +40,16 @@ Every phase gate from `NEURAL_HESTON_SPEC.md` is recorded here with measured val
   - **Gate G2 (100 noiseless surfaces, fixed cold start):** **99.0% recovery** ($\le 0.005$ vol pts, PASS $\ge 99\%$); 100% converged; 0% hit bounds; median RMSE IV = `1.19e-08` vol pts; p95 = `3.15e-07` vol pts; median LM iterations = `8.0`.
   - **Hypothesis H1 (`E0` COS+LM, 1,000 runs across 100 chains):** **p50 = `2.83 ms`**, **p95 = `5.67 ms`**, **p99 = `8.30 ms`** (`< 10 ms` -> **H1 CONFIRMED on Apple M5**).
   - **Naive Baseline (`Ref`, QuantLib Python + SciPy `least_squares`):** p50 = `244.84 ms` (**E0 is 86.7× faster** than Ref before any neural network).
+
+### Phase 3 — Data Pipeline, Adaptive Grid & Parallel OpenMP Generator (Gate G3)
+- **Status:** PASS (artifact: `results/phase3_gate_g3.json`)
+- **Deliverables:**
+  - `cpp/include/nhc/grid.hpp`: `AdaptiveGrid` (10 maturities $\in [0.025, 2.0]$ × 18 scaled log-moneyness nodes $\in [-0.55, +0.35]$ = 180 nodes) + fixed linear interpolation operator $M$ (`InterpOperator`, natural cubic spline in $k$ + linear in total variance between adjacent maturities, coverage accounting, Jacobian propagation).
+  - `python/nhc/data/spx_ingest.py`: SPX ingestion pipeline (near-ATM put-call parity OLS forward/discount extraction, bid/ask/spread/liquidity/tau/OTM filters, inverse-IV-spread weights, exact per-rule discard audit, chronological train/val/test split, and clearly tagged `synthetic_bates_spx_proxy` Bates jump-diffusion fallback when vendor CSVs are absent).
+  - `cpp/src/gen_dataset.cpp` (`nhc_gen_dataset`): Parallel OpenMP (`#pragma omp parallel for schedule(static)`) synthetic surface + analytic IV Jacobian generator with automatic high-res COS retry on extreme stress regimes.
+  - `python/nhc/data/synthetic.py`: Stratified Sobol sampler (65% normal / 25% stress / 10% empirical-perturbed from training-only COS+LM anchors), manifest writer, and committed `< 1 MB` fixture `data/mini_synthetic/`.
+- **Gate G3 Measured Values (Apple M5, 10 OpenMP threads, AppleClang 21.0.0 `-O3 -fno-math-errno`):**
+  - **120,000 valid surfaces** (180 nodes × 5 analytic IV Jacobian columns each = 129.6M labels) generated in **`15.52 s`** (**`8,196.7 surfaces/s`**; valid rate `95.88%`).
+  - **NaN/Inf count:** **`0`** (PASS).
+  - **Max IV round-trip error across all 21.6M nodes:** **`1.20e-14`** ($\le 10^{-8}$ PASS).
+  - Separate 10k validation and 10k test datasets generated locally (gitignored); `data/mini_synthetic/dataset.npz` (~800 KiB, $\le 1$ MB) committed for CI & `make repro-small`.
