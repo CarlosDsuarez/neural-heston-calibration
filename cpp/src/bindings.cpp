@@ -8,13 +8,17 @@
 
 #include <Eigen/Core>
 #include <array>
+#include <chrono>
 #include <complex>
 #include <cstddef>
 #include <string>
 #include <vector>
 
+#include "nhc/calibrate.hpp"
 #include "nhc/cos_pricer.hpp"
 #include "nhc/heston_cf.hpp"
+#include "nhc/iv_solver.hpp"
+#include "nhc/lm_solver.hpp"
 #include "nhc/types.hpp"
 
 namespace nb = nanobind;
@@ -54,6 +58,28 @@ std::pair<std::complex<double>, std::array<std::complex<double>, 5>> py_eval_cf_
   std::array<std::complex<double>, 5> dlogphi;
   nhc::eval_cf_and_dlogphi(u, tau, drift, params, phi, dlogphi);
   return {phi, dlogphi};
+}
+
+// Pure C++ steady_clock latency benchmark harness (zero Python loop overhead) for calibrate_cos_lm.
+std::pair<nb::ndarray<nb::numpy, double, nb::shape<-1>>, nhc::LmResult> py_benchmark_cos_lm_us(
+    const nhc::Market& market, const nhc::Chain& chain, const nhc::HestonParams& init,
+    const nhc::LmConfig& lm_cfg, const nhc::CosConfig& cos_cfg, int warmup, int runs,
+    nhc::ParamTransform transform) {
+  nhc::CosWorkspace ws;
+  nhc::LmResult last{};
+  for (int i = 0; i < warmup; ++i) {
+    last = nhc::calibrate_cos_lm(market, chain, init, lm_cfg, cos_cfg, transform, &ws);
+  }
+  const auto n = static_cast<std::size_t>(runs);
+  auto* buf = new double[n];
+  for (int i = 0; i < runs; ++i) {
+    const auto t0 = std::chrono::steady_clock::now();
+    last = nhc::calibrate_cos_lm(market, chain, init, lm_cfg, cos_cfg, transform, &ws);
+    const auto t1 = std::chrono::steady_clock::now();
+    buf[static_cast<std::size_t>(i)] = std::chrono::duration<double, std::micro>(t1 - t0).count();
+  }
+  nb::capsule owner(buf, [](void* p) noexcept { delete[] static_cast<double*>(p); });
+  return {nb::ndarray<nb::numpy, double, nb::shape<-1>>(buf, {n}, owner), last};
 }
 
 }  // namespace
@@ -107,6 +133,10 @@ NB_MODULE(nhc_core, m) {
       .value("VegaWeightedPrice", nhc::ResidualMode::VegaWeightedPrice)
       .value("ImpliedVol", nhc::ResidualMode::ImpliedVol);
 
+  nb::enum_<nhc::ParamTransform>(m, "ParamTransform")
+      .value("LogArtanh", nhc::ParamTransform::LogArtanh)
+      .value("SqrtDrift", nhc::ParamTransform::SqrtDrift);
+
   nb::class_<nhc::LmConfig>(m, "LmConfig")
       .def(nb::init<>())
       .def_rw("max_iter", &nhc::LmConfig::max_iter)
@@ -134,4 +164,34 @@ NB_MODULE(nhc_core, m) {
         nb::arg("cfg") = nhc::CosConfig{});
   m.def("price_chain_with_jacobian", &py_price_chain_with_jacobian, nb::arg("params"),
         nb::arg("market"), nb::arg("chain"), nb::arg("cfg") = nhc::CosConfig{});
+
+  m.def("black_scholes_price", &nhc::black_scholes_price, nb::arg("S0"), nb::arg("K"), nb::arg("r"),
+        nb::arg("q"), nb::arg("tau"), nb::arg("vol"), nb::arg("is_call"));
+  m.def("black_scholes_vega", &nhc::black_scholes_vega, nb::arg("S0"), nb::arg("K"), nb::arg("r"),
+        nb::arg("q"), nb::arg("tau"), nb::arg("vol"));
+  m.def("implied_volatility", &nhc::implied_volatility, nb::arg("price"), nb::arg("S0"),
+        nb::arg("K"), nb::arg("r"), nb::arg("q"), nb::arg("tau"), nb::arg("is_call"));
+
+  m.def(
+      "evaluate_cos_iv_rmse",
+      [](const nhc::HestonParams& theta, const nhc::Market& market, const nhc::Chain& chain,
+         const nhc::CosConfig& cos_cfg) {
+        return nhc::evaluate_cos_iv_rmse(theta, market, chain, cos_cfg);
+      },
+      nb::arg("theta"), nb::arg("market"), nb::arg("chain"), nb::arg("cos_cfg") = nhc::CosConfig{});
+
+  m.def(
+      "calibrate_cos_lm",
+      [](const nhc::Market& market, const nhc::Chain& chain, const nhc::HestonParams& init,
+         const nhc::LmConfig& lm_cfg, const nhc::CosConfig& cos_cfg,
+         nhc::ParamTransform transform) {
+        return nhc::calibrate_cos_lm(market, chain, init, lm_cfg, cos_cfg, transform);
+      },
+      nb::arg("market"), nb::arg("chain"), nb::arg("init"), nb::arg("lm_cfg") = nhc::LmConfig{},
+      nb::arg("cos_cfg") = nhc::CosConfig{}, nb::arg("transform") = nhc::ParamTransform::LogArtanh);
+
+  m.def("benchmark_cos_lm_us", &py_benchmark_cos_lm_us, nb::arg("market"), nb::arg("chain"),
+        nb::arg("init"), nb::arg("lm_cfg") = nhc::LmConfig{}, nb::arg("cos_cfg") = nhc::CosConfig{},
+        nb::arg("warmup") = 20, nb::arg("runs") = 1000,
+        nb::arg("transform") = nhc::ParamTransform::LogArtanh);
 }

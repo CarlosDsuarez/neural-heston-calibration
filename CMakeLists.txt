@@ -57,6 +57,8 @@ target_include_directories(nhc_headers INTERFACE
 target_link_libraries(nhc_headers INTERFACE Eigen3::Eigen)
 target_compile_features(nhc_headers INTERFACE cxx_std_20)
 
+target_compile_definitions(nhc_headers INTERFACE EIGEN_DONT_PARALLELIZE)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   target_compile_options(nhc_headers INTERFACE
     $<$<CONFIG:Release>:-O3 -fno-math-errno>
@@ -65,9 +67,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   )
 endif()
 
+# OpenMP is linked selectively to standalone parallel C++ tools (e.g., Phase 3 dataset generator)
+# rather than nhc_core, avoiding duplicate libomp conflicts when PyTorch is imported in Python.
+add_library(nhc_openmp INTERFACE)
 if(NHC_ENABLE_OPENMP AND OpenMP_CXX_FOUND)
-  target_link_libraries(nhc_headers INTERFACE OpenMP::OpenMP_CXX)
-  target_compile_definitions(nhc_headers INTERFACE NHC_HAS_OPENMP=1)
+  target_link_libraries(nhc_openmp INTERFACE OpenMP::OpenMP_CXX)
+  target_compile_definitions(nhc_openmp INTERFACE NHC_HAS_OPENMP=1)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -88,6 +93,7 @@ if(NHC_BUILD_TESTS)
   add_executable(nhc_tests
     cpp/tests/test_smoke.cpp
     cpp/tests/test_cos_pricer.cpp
+    cpp/tests/test_calibration.cpp
   )
   target_link_libraries(nhc_tests PRIVATE nhc_headers Catch2::Catch2WithMain)
   catch_discover_tests(nhc_tests)
